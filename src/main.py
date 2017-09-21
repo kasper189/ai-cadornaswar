@@ -79,8 +79,10 @@ class Graph(object):
             if candidate_data.my_units ==0 and candidate_data.other_units ==0 and candidate not in seen:
                 for i in self.near(candidate):
                     frontier.append(i)
-            seen.append(candidate)
 
+                seen.append(candidate)
+
+        #print >> sys.stderr, "search empty " + str(start) + " " +str(len(seen)) + "\n " + str(seen)
         return len(seen)
 
 
@@ -175,12 +177,14 @@ class General:
   #                      value_of_node += 35
   #                      seen.append(far)
 
-            value_of_node += self.graph.search_reachable_empty(i) * 10
+            value_of_node += self.graph.search_reachable_empty(i) * self.turn_count * 9
 
 
             node_power[i] = value_of_node
 
         best_attacks_tuples = sorted(node_power.items(), key=operator.itemgetter(1), reverse=True)
+
+        print >> sys.stderr, "after weight " + str(best_attacks_tuples)
 
         best_attacks = []
         for x in best_attacks_tuples:
@@ -220,23 +224,52 @@ class General:
                 self.forced_spread = near
 
 
-        for i in best_attacks:
-            for near in self.graph.near(i):
-                near_data = self.graph.get_node_data(near)
-                #if near_data.my_units <= near_data.other_units and near_data.can_assign:
-                relative_strength = near_data.my_units - near_data.other_units
-                assignable = near_data.can_assign
-                if near_data.other_units == 0 and near_data.my_units == 0 and assignable:
-                    targets.append(near)
-                elif relative_strength == 0 and assignable:
-                    targets.append(near)
-                elif relative_strength > 0:
-                    pass
-                elif relative_strength < 0 and relative_strength > -5 and assignable:
-                    for i in xrange(0, abs(relative_strength - 5)):
-                        targets.append(near)
-                elif near_data.other_tolerance == 0 and assignable:
-                    targets.append(near)
+        # for i in best_attacks:
+        #     for near in self.graph.near(i):
+        #         print >> sys.stderr, "decision for " + str(i)
+        #         near_data = self.graph.get_node_data(near)
+        #         #if near_data.my_units <= near_data.other_units and near_data.can_assign:
+        #         relative_strength = near_data.my_units - near_data.other_units
+        #         assignable = near_data.can_assign
+        #         if near_data.other_units == 0 and near_data.my_units == 0 and assignable:
+        #             targets.append(near)
+        #             print >> sys.stderr, "A"
+        #         elif relative_strength == 0 and assignable:
+        #             targets.append(near)
+        #             print >> sys.stderr, "B"
+        #         elif relative_strength > 0:
+        #             print >> sys.stderr, "C"
+        #         elif relative_strength < 0 and relative_strength > -5 and assignable:
+        #             for i in xrange(0, abs(relative_strength - 5)):
+        #                 targets.append(near)
+        #             print >> sys.stderr, "D"
+        #         elif near_data.other_tolerance == 0 and assignable:
+        #             targets.append(near)
+        #             print >> sys.stderr, "E"
+
+        for node_to_attack in best_attacks:
+            print >> sys.stderr, "decision for " + str(node_to_attack)
+            target_data = self.graph.get_node_data(node_to_attack)
+            relative_strength = target_data.my_units - target_data.other_units
+            assignable = target_data.can_assign
+            if target_data.other_units == 0 and target_data.my_units == 0 and assignable:
+                targets.append(node_to_attack)
+                print >> sys.stderr, "A"
+            elif relative_strength == 0 and assignable:
+                targets.append(node_to_attack)
+                print >> sys.stderr, "B"
+            elif relative_strength > 0:
+                print >> sys.stderr, "C"
+            elif relative_strength < 0 and relative_strength > -5 and assignable:
+                for i in xrange(0, abs(relative_strength - 5)):
+                    targets.append(node_to_attack)
+                print >> sys.stderr, "D"
+            elif target_data.other_tolerance == 0 and assignable:
+                targets.append(node_to_attack)
+                print >> sys.stderr, "E"
+
+
+
 
         # #Random assignments
         # free_places = 5
@@ -250,6 +283,7 @@ class General:
         #     best_attacks_taken += 1
 
 
+        print >> sys.stderr, "Targets after decision " + str(targets)
 
         return targets
 
@@ -267,11 +301,16 @@ class General:
 
 
     def pad_targets(self, targets):
-        while len(targets) < 5:
-            random_node = random.randint(0, self.graph.vertex_count - 1)
-            if random_node not in targets:
-                targets.append(random_node)
+        if len(targets) == 0:
+            return [0,0,0,0,0]
 
+        while len(targets) < 5:
+            #random_node = random.randint(0, self.graph.vertex_count - 1)
+            #if random_node not in targets:
+            #    targets.append(random_node)
+            targets.append(targets[0])
+
+        print >> sys.stderr, "Targets after padding " + str(targets)
         return targets
 
     def spread(self, bombed_targets):
