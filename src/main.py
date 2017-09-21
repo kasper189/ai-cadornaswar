@@ -1,6 +1,7 @@
 import sys
 import math
 import random
+import operator
 
 
 class NodeData:
@@ -51,7 +52,7 @@ class Graph(object):
     def compute_spreadable(self):
         for i in xrange(0, self.vertex_count):
             print >> sys.stderr, "i " + str(i) + " l " +str(len(self.near(i)))
-            if len(self.near(i)) >= 5:
+            if len(self.near(i)) >= 4:
                 self.spreadables.append(i)
                 print >> sys.stderr, "i spreadable"
 
@@ -64,6 +65,23 @@ class Graph(object):
         for data in self.node_data:
             as_text += "mu {0} mt{1} ou{2} ot{3} ca{4} |".format(data.my_units, data.my_tolerance, data.other_units, data.other_tolerance, data.can_assign)
         return as_text
+
+
+    def search_reachable_empty(self, start):
+        frontier = [start]
+        seen = []
+
+
+        while len(frontier) > 0:
+            candidate = frontier.pop()
+            candidate_data = self.get_node_data(candidate)
+
+            if candidate_data.my_units ==0 and candidate_data.other_units ==0 and candidate not in seen:
+                for i in self.near(candidate):
+                    frontier.append(i)
+            seen.append(candidate)
+
+        return len(seen)
 
 
 class General:
@@ -127,6 +145,120 @@ class General:
 
         return targets
 
+
+    def attack2(self):
+        node_power = {}
+
+        for i in xrange(0, self.graph.vertex_count):
+            node = self.graph.get_node_data(i)
+            value_of_node = 0
+
+            if not node.can_assign:
+                value_of_node -= 10000
+
+            value_of_node += 5 - node.other_tolerance
+
+            if node.my_units == 0 and node.other_units == 0:
+                value_of_node += 25
+
+            relative_strength = node.my_units - node.other_units
+            if relative_strength == 0:
+                value_of_node += 15
+
+            value_of_node += len(self.graph.near(i))
+
+  #          seen = []
+  ##          for near in self.graph.near(i):
+  #              for far in self.graph.near(i):
+  #                  far_data =self.graph.get_node_data(far)
+  #                  if far_data.my_units == 0 and far_data.other_units ==0 and far not in seen:
+  #                      value_of_node += 35
+  #                      seen.append(far)
+
+            value_of_node += self.graph.search_reachable_empty(i) * 10
+
+
+            node_power[i] = value_of_node
+
+        best_attacks_tuples = sorted(node_power.items(), key=operator.itemgetter(1), reverse=True)
+
+        best_attacks = []
+        for x in best_attacks_tuples:
+            best_attacks.append(x[0])
+
+        targets = []
+
+        self.turn_count += 1
+        if self.turn_count == 1:
+            start = self.starting_node()
+
+            # if len(self.graph.near(start)) >= 3:
+            #     self.forced_spread = start
+            #     targets.append(start)
+            # else:
+            best_weight = -1
+            best_weight_node = 0
+            for near in self.graph.near(start):
+                weight = 0
+                neigh_data = self.graph.get_node_data(near)
+
+                if neigh_data.my_units == 0 and neigh_data.other_units == 0:
+                    weight += 2
+                elif -2 < (neigh_data.my_units - neigh_data.other_units) < 0:
+                    weight += 1
+
+                if weight > best_weight:
+                    best_weight = weight
+                    best_weight_node = near
+
+            if self.graph.get_node_data(best_weight_node).can_assign and len(self.graph.near(best_weight_node)) > 4:
+                targets.append(near)
+                targets.append(near)
+                targets.append(near)
+                targets.append(near)
+                targets.append(near)
+                self.forced_spread = near
+
+
+        for i in best_attacks:
+            for near in self.graph.near(i):
+                near_data = self.graph.get_node_data(near)
+                #if near_data.my_units <= near_data.other_units and near_data.can_assign:
+                relative_strength = near_data.my_units - near_data.other_units
+                assignable = near_data.can_assign
+                if near_data.other_units == 0 and near_data.my_units == 0 and assignable:
+                    targets.append(near)
+                elif relative_strength == 0 and assignable:
+                    targets.append(near)
+                elif relative_strength > 0:
+                    pass
+                elif relative_strength < 0 and relative_strength > -5 and assignable:
+                    for i in xrange(0, abs(relative_strength - 5)):
+                        targets.append(near)
+                elif near_data.other_tolerance == 0 and assignable:
+                    targets.append(near)
+
+        # #Random assignments
+        # free_places = 5
+        # best_attacks_taken = 0
+        # while free_places > 0:
+        #     iterations = random.randint(0, free_places)
+        #     print >> sys.stderr, "Iterations: " + str(iterations)
+        #     for j in xrange(iterations):
+        #         free_places -= 1
+        #         targets.append(best_attacks[best_attacks_taken])
+        #     best_attacks_taken += 1
+
+
+
+        return targets
+
+
+
+
+
+
+
     def starting_node(self):
         for i in xrange(0, self.graph.vertex_count):
             if self.graph.get_node_data(i).my_units == 5:
@@ -142,19 +274,39 @@ class General:
 
         return targets
 
-    def spread(self):
+    def spread(self, bombed_targets):
         if self.forced_spread is not None:
             s = self.forced_spread
             self.forced_spread = None
             return str(s)
 
-        if len(self.graph.spreadables) == 0:
-            return "NONE"
-        return str(self.graph.spreadables[random.randint(0, len(self.graph.spreadables) - 1)])
+        # if len(self.graph.spreadables) == 0:
+        #     return "NONE"
+        #return str(self.graph.spreadables[random.randint(0, len(self.graph.spreadables) - 1)])
         #for node in self.graph.spreadables:
         #    if self.graph.get_node_data(i).my_units >= 5:
         #        return str(node)
         # return "NONE"
+
+        possible_spreaders = []
+        for i in xrange(0, self.graph.vertex_count):
+            if self.graph.get_node_data(i).my_units >= 5:
+                adj = self.graph.near(i)
+                weight = 0
+                for node in adj:
+                    if node not in bombed_targets:
+                        neigh_data = self.graph.get_node_data(node)
+                        if neigh_data.my_units == 0 and neigh_data.other_units == 0:
+                            weight += 2
+                        elif -2 < (neigh_data.my_units - neigh_data.other_units) < 0:
+                            weight += 1
+                possible_spreaders.append((i, weight))
+
+        sorted_list = sorted(possible_spreaders, key=lambda id_weight : id_weight[1])
+
+        #return sorted_list[0][0] if len(sorted_list) and sorted_list[0][0] > 0 else "NONE"
+        return "NONE"
+
 
 
 
@@ -189,11 +341,11 @@ while True:
     # Write an action using print
     # To debug: print >> sys.stderr, "Debug messages..."
 
-    targets = cadorna.pad_targets(cadorna.attack())
+    targets = cadorna.pad_targets(cadorna.attack2())
 
     for target in targets[0:5]:
         print str(target)
-    print cadorna.spread()
+    print cadorna.spread(targets[0:5])
 
 
 
