@@ -187,8 +187,10 @@ class General:
         print >> sys.stderr, "after weight " + str(best_attacks_tuples)
 
         best_attacks = []
+        best_attacks_weight = []
         for x in best_attacks_tuples:
             best_attacks.append(x[0])
+            best_attacks_weight.append(x[1])
 
         targets = []
 
@@ -256,6 +258,7 @@ class General:
                 targets.append(node_to_attack)
                 print >> sys.stderr, "A"
             elif relative_strength == 0 and assignable:
+                targets.append(node_to_attack)
                 targets.append(node_to_attack)
                 print >> sys.stderr, "B"
             elif relative_strength > 0:
