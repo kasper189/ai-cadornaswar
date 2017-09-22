@@ -90,7 +90,7 @@ class Graph(object):
             candidate = frontier.pop()
             candidate_data = self.get_node_data(candidate)
 
-            if candidate_data.my_units == 0 and candidate_data.other_units == 0 and candidate not in seen:
+            if (candidate_data.is_empty() or candidate_data.is_theirs() )and candidate not in seen:
                 for i in self.near(candidate):
                     frontier.append(i)
 
@@ -341,27 +341,58 @@ class General:
             node = self.graph.get_node_data(i)
             value_of_node = 0
 
+            unreachable_penalty = False
             if not node.can_assign:
                 value_of_node -= 10000
+                unreachable_penalty = True
+
 
             value_of_node += 5 - node.other_tolerance
+            if i == 18:
+                print >> sys.stderr,  "after tolerance " + str(value_of_node)
 
             if node.my_units == 0 and node.other_units == 0:
                 value_of_node += 25
+            if i == 18:
+                print >> sys.stderr,  "after empty " + str(value_of_node)
+
 
             relative_strength = node.my_units - node.other_units
             if relative_strength == 0:
                 value_of_node += 15
 
+            if i == 18:
+                print >> sys.stderr,  "after strenght " + str(value_of_node)
+
+
             value_of_node += len(self.graph.near(i))
+            if i == 18:
+                print >> sys.stderr,  "after nears " + str(value_of_node)
+
 
 
             value_of_node += self.graph.search_reachable_empty(i) * self.turn_count * 9
+            if i == 18:
+                print >> sys.stderr,  "after reachbles " + str(value_of_node)
 
             near_enemy = 0
             for n in self.graph.near(i):
                 near_enemy += self.graph.get_node_data(n).other_units
             value_of_node -= near_enemy * 2
+            if i == 18:
+                print >> sys.stderr,  "after defense " + str(value_of_node)
+
+
+            reachable_via_spread = False
+            for n in self.graph.near(i):
+                self.graph.get_node_data(n).is_ours()
+                reachable_via_spread = True
+            if reachable_via_spread and unreachable_penalty:
+                value_of_node += 10000
+
+            if i == 18:
+                print >> sys.stderr,  "after tie break " + str(value_of_node)
+
 
             node_power[i] = value_of_node
 
@@ -416,7 +447,9 @@ class General:
         #     elif target_data.other_tolerance == 0 and assignable:
         #         targets.append(node_to_attack)
         #         print >> sys.stderr, "E"
+        index = 0
         for node_to_attack in best_attacks:
+            index += 1
             print >> sys.stderr, "decision for " + str(node_to_attack)
             target_data = self.graph.get_node_data(node_to_attack)
             relative_strength = target_data.my_units - target_data.other_units
@@ -424,6 +457,16 @@ class General:
             if target_data.other_units == 0 and target_data.my_units == 0 and assignable:
                 targets.append(node_to_attack)
                 print >> sys.stderr, "A"
+            elif relative_strength == 0 and index == 1 and target_data.my_tolerance == 0:
+                for near in self.graph.near(node_to_attack):
+                    near_data = self.graph.get_node_data(near)
+                    if near_data.is_ours():
+                        targets.append(near)
+                        targets.append(near)
+                        targets.append(near)
+                        targets.append(near)
+                        targets.append(near)
+                        self.forced_spread = near
             elif relative_strength == 0 and assignable:
                 targets.append(node_to_attack)
                 targets.append(node_to_attack)
