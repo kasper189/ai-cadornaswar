@@ -30,6 +30,8 @@ class Graph(object):
             self.adj[i] = []
             self.node_data.append(NodeData())
 
+        self.average_grade = 0
+
 
 
 
@@ -76,7 +78,7 @@ class Graph(object):
             candidate = frontier.pop()
             candidate_data = self.get_node_data(candidate)
 
-            if candidate_data.my_units ==0 and candidate_data.other_units ==0 and candidate not in seen:
+            if candidate_data.my_units == 0 and candidate_data.other_units == 0 and candidate not in seen:
                 for i in self.near(candidate):
                     frontier.append(i)
 
@@ -84,6 +86,13 @@ class Graph(object):
 
         #print >> sys.stderr, "search empty " + str(start) + " " +str(len(seen)) + "\n " + str(seen)
         return len(seen)
+
+    def get_average_grade(self):
+        if self.average_grade ==0:
+            for i in xrange(0, self.vertex_count):
+                self.average_grade += len(self.near(i))
+        self.average_grade /= self.vertex_count
+        return self.average_grade
 
 
 class General:
@@ -292,6 +301,92 @@ class General:
 
 
 
+    def attack3(self):
+        node_power = {}
+
+        for i in xrange(0, self.graph.vertex_count):
+            node = self.graph.get_node_data(i)
+            value_of_node = 0
+
+            if not node.can_assign:
+                value_of_node -= 10000
+
+            value_of_node += 5 - node.other_tolerance
+
+            if node.my_units == 0 and node.other_units == 0:
+                value_of_node += 25
+
+            relative_strength = node.my_units - node.other_units
+            if relative_strength == 0:
+                value_of_node += 15
+
+            value_of_node += len(self.graph.near(i))
+
+
+            value_of_node += self.graph.search_reachable_empty(i) * self.turn_count * 9
+
+            near_enemy = 0
+            for n in self.graph.near(i):
+                near_enemy += self.graph.get_node_data(n).other_units
+            value_of_node -= near_enemy * 2
+
+            node_power[i] = value_of_node
+
+        best_attacks_tuples = sorted(node_power.items(), key=operator.itemgetter(1), reverse=True)
+
+        print >> sys.stderr, "after weight " + str(best_attacks_tuples)
+
+        best_attacks = []
+        best_attacks_weight = []
+        for x in best_attacks_tuples:
+            best_attacks.append(x[0])
+            best_attacks_weight.append(x[1])
+
+        targets = []
+
+        self.turn_count += 1
+        if self.turn_count <= self.graph.vertex_count / 16 and self.graph.get_average_grade() > 3:
+            possible_spread_node = best_attacks[0]
+            near = self.graph.near(possible_spread_node)
+            free_nears = 0
+            for n in near:
+                near_data = self.graph.get_node_data(n)
+                if near_data.other_units == 0 and near_data.my_units == 0:
+                    free_nears += 1
+            if free_nears >=4:
+                spread_data = self.graph.get_node_data(possible_spread_node)
+                for i in xrange(0, 5 - spread_data.my_units):
+                    targets.append(possible_spread_node)
+                self.forced_spread = possible_spread_node
+
+        for node_to_attack in best_attacks:
+            print >> sys.stderr, "decision for " + str(node_to_attack)
+            target_data = self.graph.get_node_data(node_to_attack)
+            relative_strength = target_data.my_units - target_data.other_units
+            assignable = target_data.can_assign
+            if target_data.other_units == 0 and target_data.my_units == 0 and assignable:
+                targets.append(node_to_attack)
+                print >> sys.stderr, "A"
+            elif relative_strength == 0 and assignable:
+                targets.append(node_to_attack)
+                targets.append(node_to_attack)
+                print >> sys.stderr, "B"
+            elif relative_strength > 0:
+                print >> sys.stderr, "C"
+            elif relative_strength < 0 and relative_strength > -5 and assignable:
+                for i in xrange(0, abs(relative_strength - 5)):
+                    targets.append(node_to_attack)
+                print >> sys.stderr, "D"
+            elif target_data.other_tolerance == 0 and assignable:
+                targets.append(node_to_attack)
+                print >> sys.stderr, "E"
+
+
+
+        print >> sys.stderr, "Targets after decision " + str(targets)
+
+        return targets
+
 
 
 
@@ -383,7 +478,7 @@ while True:
     # Write an action using print
     # To debug: print >> sys.stderr, "Debug messages..."
 
-    targets = cadorna.pad_targets(cadorna.attack2())
+    targets = cadorna.pad_targets(cadorna.attack3())
 
     for target in targets[0:5]:
         print str(target)
