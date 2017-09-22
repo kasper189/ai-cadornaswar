@@ -18,6 +18,18 @@ class NodeData:
     def __str__(self):
         return str(self.__dict__)
 
+    def is_ours(self):
+        return self.my_units > self.other_units
+
+    def is_theirs(self):
+        return self.my_units < self.other_units
+
+    def is_empty(self):
+        return self.my_units == 0 and self.other_units == 0
+
+    def contended(self):
+        return self.my_units == self.other_units and self.my_units != 0
+
 
 
 class Graph(object):
@@ -93,6 +105,27 @@ class Graph(object):
                 self.average_grade += len(self.near(i))
         self.average_grade /= self.vertex_count
         return self.average_grade
+
+    def conquered_nodes(self):
+        my_nodes = 0
+        other_nodes = 0
+        empty_nodes = 0
+        contended = 0
+        for i in xrange(0, self.vertex_count):
+            i_data = self.get_node_data(i)
+            if i_data.is_ours():
+                my_nodes += 1
+            elif i_data.is_theirs():
+                other_nodes += 1
+            elif i_data.is_empty():
+                empty_nodes+= 1
+            elif i_data.contended():
+                contended+= 1
+            else:
+                raise Exception ("Ma da dove 'zzo esce fuori???")
+        return (my_nodes, other_units, empty_nodes, contended)
+
+
 
 
 class General:
@@ -359,6 +392,30 @@ class General:
                     targets.append(possible_spread_node)
                 self.forced_spread = possible_spread_node
 
+        ours, theirs, empty, contended = self.graph.conquered_nodes()
+
+        # for node_to_attack in best_attacks:
+        #     print >> sys.stderr, "decision for " + str(node_to_attack)
+        #     target_data = self.graph.get_node_data(node_to_attack)
+        #     relative_strength = target_data.my_units - target_data.other_units
+        #     assignable = target_data.can_assign
+        #     if target_data.other_units == 0 and target_data.my_units == 0 and assignable:
+        #         targets.append(node_to_attack)
+        #         print >> sys.stderr, "A"
+        #     elif relative_strength == 0 and assignable:
+        #         targets.append(node_to_attack)
+        #         targets.append(node_to_attack)
+        #         print >> sys.stderr, "B"
+        #     elif relative_strength > 0 and ours > theirs and empty == 0 and self.turn_count > 30:
+        #         print >> sys.stderr, "C"
+        #         targets.append(node_to_attack)
+        #     elif relative_strength < 0 and relative_strength > -5 and assignable:
+        #         for i in xrange(0, abs(relative_strength - 5)):
+        #             targets.append(node_to_attack)
+        #         print >> sys.stderr, "D"
+        #     elif target_data.other_tolerance == 0 and assignable:
+        #         targets.append(node_to_attack)
+        #         print >> sys.stderr, "E"
         for node_to_attack in best_attacks:
             print >> sys.stderr, "decision for " + str(node_to_attack)
             target_data = self.graph.get_node_data(node_to_attack)
@@ -368,6 +425,8 @@ class General:
                 targets.append(node_to_attack)
                 print >> sys.stderr, "A"
             elif relative_strength == 0 and assignable:
+                targets.append(node_to_attack)
+                targets.append(node_to_attack)
                 targets.append(node_to_attack)
                 targets.append(node_to_attack)
                 print >> sys.stderr, "B"
